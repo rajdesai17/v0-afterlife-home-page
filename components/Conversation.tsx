@@ -209,7 +209,8 @@ export default function Conversation({ name, years, url, agentId }: Conversation
         )
 
         // Build prompt client-side — pure function, no server round-trip needed
-        const p = buildEulogyPrompt(name, research)
+        // Pass known years so we don't rely on broken regex extraction from Firecrawl
+        const p = buildEulogyPrompt(name, research, years || undefined)
         setPrompt(p)
         setView("ready")
       } catch (err) {

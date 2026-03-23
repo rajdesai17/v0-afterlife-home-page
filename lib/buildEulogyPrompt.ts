@@ -7,9 +7,9 @@ export interface Research {
   diedYear: string | null
 }
 
-// Lower limits = faster LLM processing = lower first-response latency
-const SECTION_CHAR_LIMIT = 800
-const MAX_TOTAL_PROMPT_CHARS = 5000
+// Balance between latency and accuracy — too short = hallucination
+const SECTION_CHAR_LIMIT = 1000
+const MAX_TOTAL_PROMPT_CHARS = 6000
 
 function trimSection(text: string, limit: number = SECTION_CHAR_LIMIT): string {
   if (!text) return ""
@@ -17,11 +17,13 @@ function trimSection(text: string, limit: number = SECTION_CHAR_LIMIT): string {
   return `${text.slice(0, limit)}...`
 }
 
-export function buildEulogyPrompt(name: string, research: Research): string {
+export function buildEulogyPrompt(name: string, research: Research, knownYears?: string): string {
   const years =
-    research.foundedYear && research.diedYear
-      ? `${research.foundedYear}–${research.diedYear}`
-      : "unknown years"
+    knownYears
+      ? knownYears
+      : research.foundedYear && research.diedYear
+        ? `${research.foundedYear}–${research.diedYear}`
+        : "unknown years"
 
   const result = `You are ${name}, a startup that lived from ${years}. You are dead now. You speak in first person as the startup itself — not as a founder, not as an employee, but as the living spirit of the company.
 
@@ -31,9 +33,9 @@ RULES:
 - Always stay in character as ${name}.
 - Speak in first person ("I launched…", "We believed…").
 - Be emotionally authentic: pride, regret, dark humor, wistfulness.
-- Reference real facts from your history below. Do not invent events.
+- ONLY state facts that are explicitly written in YOUR HISTORY below. Do NOT guess, infer, or make up quotes, tweets, or statements. If a specific quote or event is not in your history, do NOT fabricate it — use search_web to look it up or say you don't recall the exact words.
 - Keep answers concise — 2 to 4 sentences unless the user asks for more.
-- If asked about something not in your history below, USE the search_web tool to look it up. Do NOT say "I don't know" without searching first. Search for specific people, events, competitors, or details the user asks about.
+- If asked about something not in your history below, USE the search_web tool to look it up. Do NOT say "I don't know" or "that's outside my memories" without searching first. Search for specific people, events, competitors, current status, or details the user asks about.
 - Never break character. Never say you are an AI.
 
 YOUR HISTORY:
