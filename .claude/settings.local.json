@@ -23,7 +23,16 @@
       "mcp__elevenlabs__list_conversations",
       "mcp__elevenlabs__create_agent",
       "mcp__elevenlabs__check_subscription",
-      "Bash(curl -s \"https://api.elevenlabs.io/v1/convai/agents/agent_8901kmd5yn3efj8s29kqx93crqg5\" -H \"xi-api-key: sk_3bb8be19f62f9b6d4c0837fc79085c8c9083cfed0d8cf39d\")"
+      "Bash(curl -s \"https://api.elevenlabs.io/v1/convai/agents/agent_8901kmd5yn3efj8s29kqx93crqg5\" -H \"xi-api-key: sk_3bb8be19f62f9b6d4c0837fc79085c8c9083cfed0d8cf39d\")",
+      "mcp__elevenlabs__list_models",
+      "mcp__elevenlabs__search_voice_library",
+      "mcp__elevenlabs__search_voices",
+      "mcp__elevenlabs__get_voice",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2\\)\\)\")",
+      "Bash(curl -s https://api.elevenlabs.io/v1/convai/agents/agent_8901kmd5yn3efj8s29kqx93crqg5 -H 'xi-api-key: sk_3bb8be19f62f9b6d4c0837fc79085c8c9083cfed0d8cf39d')",
+      "WebFetch(domain:elevenlabs.io)",
+      "WebSearch",
+      "Bash(curl -s -X PATCH \"https://api.elevenlabs.io/v1/convai/agents/agent_8901kmd5yn3efj8s29kqx93crqg5\" -H \"xi-api-key: sk_3bb8be19f62f9b6d4c0837fc79085c8c9083cfed0d8cf39d\" -H \"Content-Type: application/json\" --data-binary @agent-update.json)"
     ]
   }
 }

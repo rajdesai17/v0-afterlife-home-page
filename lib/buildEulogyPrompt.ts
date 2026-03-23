@@ -7,9 +7,9 @@ export interface Research {
   diedYear: string | null
 }
 
-const SECTION_CHAR_LIMIT = 1200
-/** Keeps ConvAI prompt overrides within a safe size so the agent does not drop the session right after connect. */
-const MAX_TOTAL_PROMPT_CHARS = 7500
+// Lower limits = faster LLM processing = lower first-response latency
+const SECTION_CHAR_LIMIT = 800
+const MAX_TOTAL_PROMPT_CHARS = 5000
 
 function trimSection(text: string, limit: number = SECTION_CHAR_LIMIT): string {
   if (!text) return ""
@@ -33,7 +33,7 @@ RULES:
 - Be emotionally authentic: pride, regret, dark humor, wistfulness.
 - Reference real facts from your history below. Do not invent events.
 - Keep answers concise — 2 to 4 sentences unless the user asks for more.
-- If asked about something you don't know, say so honestly.
+- If asked about something not in your history below, USE the search_web tool to look it up. Do NOT say "I don't know" without searching first. Search for specific people, events, competitors, or details the user asks about.
 - Never break character. Never say you are an AI.
 
 YOUR HISTORY:

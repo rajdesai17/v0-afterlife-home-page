@@ -1,0 +1,6 @@
+[mcp_servers.elevenlabs]
+command = 'C:\Users\Raj\AppData\Local\Programs\Python\Python312\Scripts\uvx.exe'
+args = ["elevenlabs-mcp"]
+
+[mcp_servers.elevenlabs.env]
+ELEVENLABS_API_KEY = "sk_3bb8be19f62f9b6d4c0837fc79085c8c9083cfed0d8cf39d"

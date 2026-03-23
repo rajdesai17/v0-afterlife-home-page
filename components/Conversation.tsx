@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { useConversation } from "@elevenlabs/react"
 import { Mic, MicOff, Check, ArrowLeft } from "lucide-react"
 import Link from "next/link"
-import type { Research } from "@/lib/buildEulogyPrompt"
+import { buildEulogyPrompt, type Research } from "@/lib/buildEulogyPrompt"
 
 type ViewState = "researching" | "ready" | "live" | "eulogy"
 
@@ -75,6 +75,7 @@ export default function Conversation({ name, years, url, agentId }: Conversation
   const transcriptRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const researchRef = useRef<Research | null>(null)
+  const signedUrlRef = useRef<string | null>(null)
   const didStartResearch = useRef(false)
   const transcriptLengthRef = useRef(0)
   const elapsedSecondsRef = useRef(0)
@@ -162,57 +163,53 @@ export default function Conversation({ name, years, url, agentId }: Conversation
     }
   }, [view, startTime])
 
-  // Research on mount (guarded against Strict Mode double-fire)
+  // Parallel fetch: research + signed URL + mic permission (guarded against Strict Mode double-fire)
   useEffect(() => {
     if (didStartResearch.current) return
     didStartResearch.current = true
 
-    async function doResearch() {
-      console.log(`[client] Starting research for "${name}"...`)
-      // Mark all as active
+    async function doSetup() {
       setResearchItems((items) =>
         items.map((item) => ({ ...item, status: "active" as const }))
       )
 
       try {
-        const res = await fetch("/api/research", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, url }),
-        })
+        // Fire all three in parallel — signed URL doesn't depend on research
+        const [researchRes, signedUrlRes] = await Promise.all([
+          fetch("/api/research", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, url }),
+          }),
+          fetch("/api/signed-url", { method: "POST" }),
+          // Pre-request mic permission so it's ready when user clicks "Start"
+          navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+            // Stop tracks immediately — we just needed the permission grant
+            stream.getTracks().forEach((t) => t.stop())
+          }).catch(() => { /* mic permission will be re-requested by ElevenLabs SDK */ }),
+        ])
 
-        if (!res.ok) {
-          const body = await res.text()
-          console.error(`[client] Research API returned ${res.status}:`, body)
+        if (!researchRes.ok) {
           throw new Error("Research failed")
         }
+        if (!signedUrlRes.ok) {
+          throw new Error("Failed to get signed URL")
+        }
 
-        const research: Research = await res.json()
+        const [research, { signedUrl: fetchedSignedUrl }] = await Promise.all([
+          researchRes.json() as Promise<Research>,
+          signedUrlRes.json() as Promise<{ signedUrl: string }>,
+        ])
+
         researchRef.current = research
-        console.log(`[client] Research complete — foundedYear=${research.foundedYear}, diedYear=${research.diedYear}`)
+        signedUrlRef.current = fetchedSignedUrl
 
-        // Mark all as done
         setResearchItems((items) =>
           items.map((item) => ({ ...item, status: "done" as const }))
         )
 
-        // Build prompt on client side
-        console.log("[client] Fetching prompt...")
-        const promptRes = await fetch("/api/signed-url", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, research }),
-        })
-
-        if (!promptRes.ok) {
-          const body = await promptRes.text()
-          console.error(`[client] Prompt API returned ${promptRes.status}:`, body)
-          throw new Error("Failed to build prompt")
-        }
-
-        const { prompt: p } = await promptRes.json()
-        console.log(`[client] Got prompt (${p?.length ?? 0} chars)`)
-        console.log("[client] Ready to start conversation")
+        // Build prompt client-side — pure function, no server round-trip needed
+        const p = buildEulogyPrompt(name, research)
         setPrompt(p)
         setView("ready")
       } catch (err) {
@@ -221,21 +218,42 @@ export default function Conversation({ name, years, url, agentId }: Conversation
       }
     }
 
-    doResearch()
+    doSetup()
   }, [name, url])
 
   async function startConversation() {
     if (!prompt || isStartingSession) return
 
+    const signedUrl = signedUrlRef.current
+    if (!signedUrl) {
+      setError("Signed URL not ready. Please wait and retry.")
+      return
+    }
+
     try {
       setError(null)
       setIsStartingSession(true)
-      console.log("[client] Starting ElevenLabs session...")
+      // Use pre-fetched signedUrl instead of agentId — saves a round-trip at session start
       const conversationId = await conversation.startSession({
-        agentId,
+        signedUrl,
         overrides: {
           agent: {
             prompt: { prompt },
+          },
+        },
+        clientTools: {
+          search_web: async (parameters: { query: string }) => {
+            try {
+              const res = await fetch("/api/search-tool", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query: parameters.query }),
+              })
+              const data = await res.json()
+              return data.result || "No results found."
+            } catch {
+              return "Search failed. I don't have that information right now."
+            }
           },
         },
       })
