@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm add:*)",
+      "Bash(npm search:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node -e \"const f = require\\(''@mendable/firecrawl-js''\\); console.log\\(Object.keys\\(f\\)\\)\")",
+      "Bash(node -e \":*)",
+      "Bash(node -e \"console.log\\(require.resolve\\(''@elevenlabs/client''\\)\\)\")",
+      "Bash(find C:/Users/Raj/elevenhacks/v0-afterlife-home-page/node_modules/.pnpm -path *@elevenlabs+client* -name *.d.ts)",
+      "Bash(find C:/Users/Raj/elevenhacks/v0-afterlife-home-page/node_modules/.pnpm -path *@elevenlabs+types* -name *.d.ts)",
+      "Bash(npm view:*)",
+      "Bash(find C:/Users/Raj/elevenhacks/v0-afterlife-home-page/node_modules/@elevenlabs -name *.js -o -name *.mjs -o -name *.cjs)",
+      "Bash(tr ';' '\\\\n')",
+      "WebFetch(domain:www.npmjs.com)",
+      "mcp__elevenlabs__get_agent",
+      "mcp__elevenlabs__list_agents",
+      "WebFetch(domain:registry.npmjs.org)",
+      "Bash(node:*)",
+      "Bash(node -pe \"JSON.parse\\(require\\(''''fs''''\\).readFileSync\\(''''/dev/stdin'''',''''utf8''''\\)\\).version\")",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "mcp__elevenlabs__get_conversation",
+      "mcp__elevenlabs__list_conversations",
+      "mcp__elevenlabs__create_agent",
+      "mcp__elevenlabs__check_subscription",
+      "Bash(curl -s \"https://api.elevenlabs.io/v1/convai/agents/agent_8901kmd5yn3efj8s29kqx93crqg5\" -H \"xi-api-key: sk_3bb8be19f62f9b6d4c0837fc79085c8c9083cfed0d8cf39d\")"
+    ]
+  }
+}

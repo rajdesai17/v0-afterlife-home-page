@@ -1,66 +1,9 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useState } from "react"
-
-const STARTUPS = [
-  {
-    id: "vine",
-    name: "Vine",
-    years: "2012 — 2017",
-    cause: "Twitter pulled the plug",
-    accent: "#00B488",
-  },
-  {
-    id: "quibi",
-    name: "Quibi",
-    years: "2020 — 2020",
-    cause: "$1.75B in 6 months",
-    accent: "#FF6B00",
-  },
-  {
-    id: "google-plus",
-    name: "Google+",
-    years: "2011 — 2019",
-    cause: "Nobody actually used it",
-    accent: "#4285F4",
-  },
-  {
-    id: "clubhouse",
-    name: "Clubhouse",
-    years: "2020 — 2023",
-    cause: "The world went back outside",
-    accent: "#C8C4B4",
-  },
-  {
-    id: "juicero",
-    name: "Juicero",
-    years: "2016 — 2017",
-    cause: "You could just squeeze the bag",
-    accent: "#FF4500",
-  },
-  {
-    id: "myspace",
-    name: "Myspace",
-    years: "2003 — 2011",
-    cause: "Facebook showed up",
-    accent: "#003399",
-  },
-  {
-    id: "yik-yak",
-    name: "Yik Yak",
-    years: "2013 — 2017",
-    cause: "Died twice",
-    accent: "#FF6600",
-  },
-  {
-    id: "path",
-    name: "Path",
-    years: "2010 — 2018",
-    cause: "Almost worked. Almost.",
-    accent: "#E8334A",
-  },
-]
+import { STARTUPS } from "@/lib/startups"
 
 function StartupCard({
   startup,
@@ -121,8 +64,17 @@ function StartupGrid() {
 }
 
 function CustomInput() {
+  const router = useRouter()
   const [startupName, setStartupName] = useState("")
   const [wikiUrl, setWikiUrl] = useState("")
+
+  function handleGo() {
+    if (!startupName.trim()) return
+    const slug = startupName.trim().toLowerCase().replace(/\s+/g, "-")
+    const params = new URLSearchParams({ name: startupName.trim() })
+    if (wikiUrl.trim()) params.set("url", wikiUrl.trim())
+    router.push(`/${encodeURIComponent(slug)}?${params.toString()}`)
+  }
 
   return (
     <section className="border-t border-[#1a1a1a] px-4 md:px-8 py-16">
@@ -133,6 +85,7 @@ function CustomInput() {
             placeholder="Type any startup name..."
             value={startupName}
             onChange={(e) => setStartupName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleGo()}
             className="flex-1 bg-[#111111] border border-[#222222] px-4 py-3 text-sm text-white placeholder:text-[#444444] focus:outline-none focus:border-[#333333]"
           />
           <input
@@ -140,11 +93,13 @@ function CustomInput() {
             placeholder="Or paste a Wikipedia URL (optional)"
             value={wikiUrl}
             onChange={(e) => setWikiUrl(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleGo()}
             className="flex-1 bg-[#111111] border border-[#222222] px-4 py-3 text-sm text-white placeholder:text-[#444444] focus:outline-none focus:border-[#333333]"
           />
         </div>
         <button
           type="button"
+          onClick={handleGo}
           className="mt-4 bg-white text-black px-6 py-3 text-sm font-medium rounded-[2px] hover:bg-[#e5e5e5] transition-colors"
         >
           {"Talk to them →"}

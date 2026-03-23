@@ -1,0 +1,11 @@
+[mcp_servers.vercel-test]
+url = "https://mcp.vercel.com"
+
+[mcp_servers.MCP_DOCKER]
+command = "Files"
+args = ["--", "docker", "mcp", "gateway", "run"]
+
+[mcp_servers.MCP_DOCKER.env]
+LOCALAPPDATA = 'C:\Users\Raj\AppData\Local'
+ProgramData = 'C:\ProgramData'
+ProgramFiles = 'C:\Program'
