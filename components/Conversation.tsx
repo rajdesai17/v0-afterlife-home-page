@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useConversation } from "@elevenlabs/react"
-import { Mic, MicOff, Check, ArrowLeft } from "lucide-react"
+import { Mic, Check, ArrowLeft, Copy, RotateCcw } from "lucide-react"
 import Link from "next/link"
 import { buildEulogyPrompt, type Research } from "@/lib/buildEulogyPrompt"
 
@@ -29,45 +29,38 @@ interface ConversationProps {
 function StatusIndicator({ status }: { status: ResearchItem["status"] }) {
   if (status === "done") {
     return (
-      <span className="flex size-4 items-center justify-center text-emerald-500">
-        <Check className="size-3" strokeWidth={3} />
+      <span className="flex size-5 items-center justify-center rounded-full bg-live/10">
+        <Check className="size-3 text-live" strokeWidth={2.5} />
       </span>
     )
   }
   if (status === "active") {
     return (
-      <span className="relative flex size-4 items-center justify-center">
-        <span className="absolute size-2 animate-ping rounded-full bg-amber-500 opacity-75" />
-        <span className="size-2 rounded-full bg-amber-500" />
+      <span className="relative flex size-5 items-center justify-center">
+        <span className="absolute size-2.5 animate-ping rounded-full bg-live opacity-50" />
+        <span className="size-2 rounded-full bg-live" />
       </span>
     )
   }
   return (
-    <span className="flex size-4 items-center justify-center">
-      <span className="size-2 rounded-full border border-zinc-600" />
+    <span className="flex size-5 items-center justify-center">
+      <span className="size-2 rounded-full border border-ghost" />
     </span>
   )
-}
-
-function formatDuration(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000)
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`
 }
 
 export default function Conversation({ name, years, url, agentId }: ConversationProps) {
   const [view, setView] = useState<ViewState>("researching")
   const [researchItems, setResearchItems] = useState<ResearchItem[]>([
-    { label: "Reading Wikipedia...", status: "pending" },
-    { label: "Finding the launch moment...", status: "pending" },
-    { label: "Reading the obituary...", status: "pending" },
-    { label: "Finding the founder's last words...", status: "pending" },
+    { label: "Reading Wikipedia", status: "pending" },
+    { label: "Finding the launch moment", status: "pending" },
+    { label: "Reading the obituary", status: "pending" },
+    { label: "Finding founder's last words", status: "pending" },
   ])
   const [prompt, setPrompt] = useState<string | null>(null)
   const [transcript, setTranscript] = useState<TranscriptMessage[]>([])
   const [startTime, setStartTime] = useState<Date | null>(null)
-  const [duration, setDuration] = useState<string>("0m 00s")
+  const [duration, setDuration] = useState<string>("0:00")
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -105,8 +98,6 @@ export default function Conversation({ name, years, url, agentId }: Conversation
       setIsStartingSession(false)
       const hasNoMessages = transcriptLengthRef.current === 0
       const isImmediateDrop = elapsedSecondsRef.current === 0
-      // If the socket drops before any exchange happened, keep the user in "ready"
-      // so they can retry instead of jumping straight to an empty eulogy.
       setView((current) => {
         if ((current === "live" || current === "ready") && hasNoMessages && isImmediateDrop) {
           return "ready"
@@ -114,7 +105,7 @@ export default function Conversation({ name, years, url, agentId }: Conversation
         return "eulogy"
       })
       if (hasNoMessages && isImmediateDrop) {
-        setError("Conversation ended before it could begin. Please try again.")
+        setError("Connection ended unexpectedly. Please try again.")
       }
     }, []),
     onStatusChange: useCallback(({ status }: { status: string }) => {
@@ -132,20 +123,18 @@ export default function Conversation({ name, years, url, agentId }: Conversation
           ? message
           : message instanceof Error
             ? message.message
-            : "An unexpected conversation error occurred"
+            : "An unexpected error occurred"
       console.error("[conv] Error:", message)
       setError(normalized)
     }, []),
   })
 
-  // Auto-scroll transcript
   useEffect(() => {
     if (transcriptRef.current) {
       transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight
     }
   }, [transcript])
 
-  // Live timer
   useEffect(() => {
     if (view === "live" && startTime) {
       timerRef.current = setInterval(() => {
@@ -153,7 +142,7 @@ export default function Conversation({ name, years, url, agentId }: Conversation
           const next = prev + 1
           const m = Math.floor(next / 60)
           const s = next % 60
-          setDuration(`${m}m ${s.toString().padStart(2, "0")}s`)
+          setDuration(`${m}:${s.toString().padStart(2, "0")}`)
           return next
         })
       }, 1000)
@@ -163,7 +152,6 @@ export default function Conversation({ name, years, url, agentId }: Conversation
     }
   }, [view, startTime])
 
-  // Parallel fetch: research + signed URL + mic permission (guarded against Strict Mode double-fire)
   useEffect(() => {
     if (didStartResearch.current) return
     didStartResearch.current = true
@@ -174,7 +162,6 @@ export default function Conversation({ name, years, url, agentId }: Conversation
       )
 
       try {
-        // Fire all three in parallel — signed URL doesn't depend on research
         const [researchRes, signedUrlRes] = await Promise.all([
           fetch("/api/research", {
             method: "POST",
@@ -182,19 +169,13 @@ export default function Conversation({ name, years, url, agentId }: Conversation
             body: JSON.stringify({ name, url }),
           }),
           fetch("/api/signed-url", { method: "POST" }),
-          // Pre-request mic permission so it's ready when user clicks "Start"
           navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-            // Stop tracks immediately — we just needed the permission grant
             stream.getTracks().forEach((t) => t.stop())
-          }).catch(() => { /* mic permission will be re-requested by ElevenLabs SDK */ }),
+          }).catch(() => {}),
         ])
 
-        if (!researchRes.ok) {
-          throw new Error("Research failed")
-        }
-        if (!signedUrlRes.ok) {
-          throw new Error("Failed to get signed URL")
-        }
+        if (!researchRes.ok) throw new Error("Research failed")
+        if (!signedUrlRes.ok) throw new Error("Failed to get signed URL")
 
         const [research, { signedUrl: fetchedSignedUrl }] = await Promise.all([
           researchRes.json() as Promise<Research>,
@@ -208,8 +189,6 @@ export default function Conversation({ name, years, url, agentId }: Conversation
           items.map((item) => ({ ...item, status: "done" as const }))
         )
 
-        // Build prompt client-side — pure function, no server round-trip needed
-        // Pass known years so we don't rely on broken regex extraction from Firecrawl
         const p = buildEulogyPrompt(name, research, years || undefined)
         setPrompt(p)
         setView("ready")
@@ -220,21 +199,20 @@ export default function Conversation({ name, years, url, agentId }: Conversation
     }
 
     doSetup()
-  }, [name, url])
+  }, [name, url, years])
 
   async function startConversation() {
     if (!prompt || isStartingSession) return
 
     const signedUrl = signedUrlRef.current
     if (!signedUrl) {
-      setError("Signed URL not ready. Please wait and retry.")
+      setError("Not ready yet. Please wait.")
       return
     }
 
     try {
       setError(null)
       setIsStartingSession(true)
-      // Use pre-fetched signedUrl instead of agentId — saves a round-trip at session start
       const conversationId = await conversation.startSession({
         signedUrl,
         overrides: {
@@ -253,7 +231,7 @@ export default function Conversation({ name, years, url, agentId }: Conversation
               const data = await res.json()
               return data.result || "No results found."
             } catch {
-              return "Search failed. I don't have that information right now."
+              return "Search failed."
             }
           },
         },
@@ -261,14 +239,11 @@ export default function Conversation({ name, years, url, agentId }: Conversation
       console.log(`[client] Session started — id: ${conversationId}`)
       setStartTime(new Date())
       setElapsedSeconds(0)
-      setDuration("0m 00s")
+      setDuration("0:00")
       setView("live")
     } catch (err) {
       console.error("[client] Failed to start session:", err)
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Failed to start conversation. Check microphone permission and retry."
+      const message = err instanceof Error ? err.message : "Failed to start conversation."
       setError(message)
       setView("ready")
     } finally {
@@ -294,42 +269,55 @@ export default function Conversation({ name, years, url, agentId }: Conversation
 
   const upperName = name.toUpperCase()
 
+  // Error state during research
   if (error && view === "researching") {
     return (
-      <main className="min-h-screen bg-[#0a0a0a]">
-        <div className="flex flex-col items-center px-4 py-16">
-          <h1 className="font-serif text-5xl italic text-white">{name}</h1>
-          <p className="mt-8 text-sm text-red-400">{error}</p>
-          <Link
-            href="/"
-            className="mt-4 flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="size-4" /> Back home
-          </Link>
-        </div>
+      <main className="flex min-h-screen flex-col items-center bg-background px-4 pt-20">
+        <Link
+          href="/"
+          className="mb-8 flex items-center gap-2 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-3" /> Back
+        </Link>
+        <h1 className="font-serif text-4xl italic text-foreground">{name}</h1>
+        <p className="mt-6 max-w-md text-center text-sm text-destructive">{error}</p>
       </main>
     )
   }
 
   return (
-    <main className="min-h-screen bg-[#0a0a0a]">
+    <main className="flex min-h-screen flex-col bg-background">
       {/* Researching state */}
       {view === "researching" && (
-        <div className="flex flex-col items-center px-4 py-16">
-          <h1 className="font-serif text-5xl italic text-white">{name}</h1>
-          <p className="mt-2 text-sm text-zinc-500">{years}</p>
-          <div className="my-8 h-px w-full max-w-xs bg-[#1a1a1a]" />
+        <div className="flex flex-1 flex-col items-center px-4 pt-20">
+          <Link
+            href="/"
+            className="mb-8 flex items-center gap-2 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-3" /> Back
+          </Link>
+          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
+            Summoning
+          </p>
+          <h1 className="mt-4 font-serif text-4xl italic text-foreground md:text-5xl">
+            {name}
+          </h1>
+          {years && (
+            <p className="mt-2 font-mono text-sm text-muted-foreground">{years}</p>
+          )}
 
-          <div className="flex w-full max-w-[360px] flex-col gap-3">
+          <div className="my-10 h-px w-full max-w-xs bg-border" />
+
+          <div className="flex w-full max-w-sm flex-col gap-4">
             {researchItems.map((item, i) => (
               <div key={i} className="flex items-center gap-3">
                 <StatusIndicator status={item.status} />
                 <span
-                  className={
+                  className={`text-sm ${
                     item.status === "pending"
-                      ? "text-zinc-600"
-                      : "text-zinc-300"
-                  }
+                      ? "text-ghost"
+                      : "text-foreground"
+                  }`}
                 >
                   {item.label}
                 </span>
@@ -337,24 +325,38 @@ export default function Conversation({ name, years, url, agentId }: Conversation
             ))}
           </div>
 
-          <p className="mt-8 text-sm italic text-zinc-600">
-            Gathering their history...
+          <p className="mt-10 font-mono text-xs text-ghost">
+            Gathering memories...
           </p>
         </div>
       )}
 
-      {/* Ready state — research done, ready to talk */}
+      {/* Ready state */}
       {view === "ready" && (
-        <div className="flex flex-col items-center px-4 py-16">
-          <h1 className="font-serif text-5xl italic text-white">{name}</h1>
-          <p className="mt-2 text-sm text-zinc-500">{years}</p>
-          <div className="my-8 h-px w-full max-w-xs bg-[#1a1a1a]" />
+        <div className="flex flex-1 flex-col items-center px-4 pt-20">
+          <Link
+            href="/"
+            className="mb-8 flex items-center gap-2 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-3" /> Back
+          </Link>
+          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-live">
+            Ready
+          </p>
+          <h1 className="mt-4 font-serif text-4xl italic text-foreground md:text-5xl">
+            {name}
+          </h1>
+          {years && (
+            <p className="mt-2 font-mono text-sm text-muted-foreground">{years}</p>
+          )}
 
-          <div className="flex w-full max-w-[360px] flex-col gap-3">
+          <div className="my-10 h-px w-full max-w-xs bg-border" />
+
+          <div className="flex w-full max-w-sm flex-col gap-4">
             {researchItems.map((item, i) => (
               <div key={i} className="flex items-center gap-3">
                 <StatusIndicator status={item.status} />
-                <span className="text-zinc-300">{item.label}</span>
+                <span className="text-sm text-foreground">{item.label}</span>
               </div>
             ))}
           </div>
@@ -363,57 +365,63 @@ export default function Conversation({ name, years, url, agentId }: Conversation
             type="button"
             onClick={startConversation}
             disabled={isStartingSession}
-            className="mt-10 bg-white text-black px-8 py-3 text-sm font-medium rounded-[2px] hover:bg-[#e5e5e5] transition-colors"
+            className="mt-12 rounded-lg bg-primary px-8 py-3 font-sans text-sm font-medium text-primary-foreground transition-all hover:opacity-90 disabled:opacity-50"
           >
-            {isStartingSession ? "Starting..." : "Start conversation"}
+            {isStartingSession ? "Connecting..." : "Start conversation"}
           </button>
-          {error && <p className="mt-4 text-xs text-red-400 text-center">{error}</p>}
+          {error && (
+            <p className="mt-4 text-center text-xs text-destructive">{error}</p>
+          )}
         </div>
       )}
 
       {/* Live state */}
       {view === "live" && (
-        <div className="flex flex-col px-4 py-8 max-w-2xl mx-auto">
-          {/* Top bar */}
-          <div className="flex items-center justify-between border-b border-[#222222] pb-4">
-            <div className="flex items-center gap-2">
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-              </span>
-              <span className="text-sm font-medium text-white">{name}</span>
-              <span className="text-sm text-zinc-500">
-                {conversation.isSpeaking ? "Speaking now" : "Listening"}
+        <div className="flex flex-1 flex-col">
+          {/* Header */}
+          <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur-sm">
+            <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-4">
+              <div className="flex items-center gap-3">
+                <span className="relative flex size-2">
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-live opacity-50" />
+                  <span className="relative inline-flex size-2 rounded-full bg-live" />
+                </span>
+                <span className="font-sans text-sm font-medium text-foreground">
+                  {name}
+                </span>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {conversation.isSpeaking ? "Speaking" : "Listening"}
+                </span>
+              </div>
+              <span className="font-mono text-sm tabular-nums text-muted-foreground">
+                {duration}
               </span>
             </div>
-            <span className="font-mono text-sm text-zinc-400">{duration}</span>
-          </div>
+          </header>
 
-          {/* Transcript area */}
+          {/* Transcript */}
           <div
             ref={transcriptRef}
-            className="my-6 flex max-h-[400px] flex-col gap-6 overflow-y-auto"
+            className="mx-auto flex max-w-2xl flex-1 flex-col gap-6 overflow-y-auto px-4 py-6"
           >
             {transcript.length === 0 && (
-              <p className="text-sm italic text-zinc-600 text-center py-8">
+              <p className="py-12 text-center text-sm text-ghost">
                 Waiting for {name} to speak...
               </p>
             )}
             {transcript.map((msg, i) => (
-              <div key={i} className="flex flex-col gap-1">
+              <div key={i} className="flex flex-col gap-1.5">
                 <span
-                  className={`text-[11px] font-medium uppercase tracking-wider ${
-                    msg.role === "agent"
-                      ? "text-emerald-500"
-                      : "text-zinc-500"
+                  className={`font-mono text-[10px] font-medium uppercase tracking-wider ${
+                    msg.role === "agent" ? "text-live" : "text-muted-foreground"
                   }`}
                 >
                   {msg.role === "agent" ? upperName : "YOU"}
                 </span>
                 <p
-                  className={
-                    msg.role === "agent" ? "text-white" : "text-zinc-400"
-                  }
+                  className={`text-[15px] leading-relaxed ${
+                    msg.role === "agent" ? "text-foreground" : "text-muted-foreground"
+                  }`}
                 >
                   {msg.message}
                 </p>
@@ -422,77 +430,82 @@ export default function Conversation({ name, years, url, agentId }: Conversation
           </div>
 
           {/* Mic button */}
-          <div className="flex flex-col items-center gap-3 pt-4">
-            <button
-              type="button"
-              onClick={endConversation}
-              className="group relative flex size-16 items-center justify-center rounded-full border border-white/20 bg-[#0a0a0a] transition-colors hover:border-red-500/40"
-            >
-              {conversation.isSpeaking && (
-                <span className="absolute inset-0 animate-pulse rounded-full border-2 border-emerald-500/50" />
-              )}
-              <Mic className="size-6 text-white" />
-            </button>
-            <span className="text-xs text-zinc-600">Tap to end</span>
+          <div className="sticky bottom-0 border-t border-border bg-background/80 backdrop-blur-sm">
+            <div className="mx-auto flex max-w-2xl flex-col items-center gap-2 px-4 py-6">
+              <button
+                type="button"
+                onClick={endConversation}
+                className="group relative flex size-16 items-center justify-center rounded-full border border-border bg-card transition-all hover:border-destructive/50 hover:bg-destructive/10"
+              >
+                {conversation.isSpeaking && (
+                  <span className="absolute inset-0 animate-pulse rounded-full border-2 border-live/30" />
+                )}
+                <Mic className="size-6 text-foreground transition-colors group-hover:text-destructive" />
+              </button>
+              <span className="font-mono text-[10px] text-ghost">Tap to end</span>
+            </div>
           </div>
 
           {error && (
-            <p className="mt-4 text-xs text-red-400 text-center">{error}</p>
+            <p className="absolute bottom-24 left-1/2 -translate-x-1/2 text-xs text-destructive">
+              {error}
+            </p>
           )}
         </div>
       )}
 
       {/* Eulogy state */}
       {view === "eulogy" && (
-        <div className="flex justify-center px-4 py-16">
-          <div className="w-full max-w-[400px] rounded-sm border border-[#222222] bg-[#111111] p-8">
-            <p className="text-xs text-zinc-500">You talked to</p>
-            <h2 className="mt-1 font-serif text-4xl italic text-white">
+        <div className="flex flex-1 items-center justify-center px-4 py-16">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-8">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              You talked to
+            </p>
+            <h2 className="mt-2 font-serif text-3xl italic text-foreground md:text-4xl">
               {name}
             </h2>
-            <p className="mt-1 text-sm text-zinc-500">{years}</p>
+            {years && (
+              <p className="mt-1 font-mono text-sm text-muted-foreground">{years}</p>
+            )}
 
-            {/* Pull quote */}
             {pullQuote && (
-              <blockquote className="my-8 border-l-2 border-emerald-500 pl-4 italic text-white">
-                &ldquo;{pullQuote}&rdquo;
+              <blockquote className="my-8 border-l-2 border-live pl-4 text-[15px] italic leading-relaxed text-foreground">
+                "{pullQuote}"
               </blockquote>
             )}
 
             {/* Stats */}
             <div className="flex flex-wrap gap-2">
-              {[
-                { value: duration, label: "Duration" },
-                {
-                  value: String(transcript.length),
-                  label: "Messages",
-                },
-                { value: "4", label: "Sources" },
-              ].map((stat) => (
-                <div
-                  key={stat.label}
-                  className="rounded-sm bg-[#1a1a1a] px-3 py-1.5 text-xs text-zinc-400"
-                >
-                  <span className="text-white">{stat.value}</span> ·{" "}
-                  {stat.label}
-                </div>
-              ))}
+              <div className="rounded-md bg-surface px-3 py-1.5 font-mono text-xs">
+                <span className="text-foreground">{duration}</span>
+                <span className="text-muted-foreground"> duration</span>
+              </div>
+              <div className="rounded-md bg-surface px-3 py-1.5 font-mono text-xs">
+                <span className="text-foreground">{transcript.length}</span>
+                <span className="text-muted-foreground"> messages</span>
+              </div>
+              <div className="rounded-md bg-surface px-3 py-1.5 font-mono text-xs">
+                <span className="text-foreground">4</span>
+                <span className="text-muted-foreground"> sources</span>
+              </div>
             </div>
 
-            {/* Buttons */}
+            {/* Actions */}
             <div className="mt-8 flex gap-3">
               <Link
                 href="/"
-                className="flex-1 rounded-sm border border-[#222222] px-4 py-2.5 text-sm text-white text-center transition-colors hover:border-zinc-600"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-border px-4 py-3 font-sans text-sm text-foreground transition-colors hover:bg-surface"
               >
-                Talk again
+                <RotateCcw className="size-4" />
+                Again
               </Link>
               <button
                 type="button"
                 onClick={handleShare}
-                className="flex-1 rounded-sm bg-white px-4 py-2.5 text-sm font-medium text-black transition-opacity hover:opacity-90"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 font-sans text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
               >
-                {copied ? "Copied!" : "Share eulogy"}
+                <Copy className="size-4" />
+                {copied ? "Copied!" : "Share"}
               </button>
             </div>
           </div>
