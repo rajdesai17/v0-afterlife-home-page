@@ -96,7 +96,7 @@ function SummonSection() {
 
 function Hero() {
   return (
-    <section className="flex flex-col items-center px-4 pt-20 pb-12 md:pt-32 md:pb-16">
+    <section className="flex flex-col items-center px-4 pt-28 pb-12 md:pt-40 md:pb-16">
       <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
         Talk to dead startups
       </p>
