@@ -15,14 +15,19 @@ function extractYear(text: string, pattern: RegExp): string | null {
   return match ? match[1] : null
 }
 
+export interface SearchSource {
+  url: string
+  title: string
+  snippet: string
+  status: "searching" | "found" | "not_found"
+}
+
 export interface ResearchStep {
   type: "step"
   index: number
   label: string
   status: "searching" | "found" | "not_found"
-  query?: string
-  resultCount?: number
-  snippet?: string
+  sources: SearchSource[]
 }
 
 export interface ResearchComplete {
@@ -55,70 +60,144 @@ export async function POST(req: Request) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
       }
 
-      const queries = [
-        { query: `${name} startup founded history site:en.wikipedia.org`, label: "Reading Wikipedia" },
-        { query: `${name} startup ProductHunt launch day excitement`, label: "Finding the launch moment" },
-        { query: `${name} startup shutdown closed failed obituary`, label: "Reading the obituary" },
-        { query: `${name} founder statement blog postmortem why we failed`, label: "Finding founder's last words" },
+      // Each step has multiple queries to search for more comprehensive results
+      const steps = [
+        {
+          label: "Reading Wikipedia",
+          queries: [
+            `${name} startup site:en.wikipedia.org`,
+            `${name} company history founded site:wikipedia.org`,
+            `${name} tech startup wiki`,
+            `${name} startup crunchbase profile`,
+          ],
+        },
+        {
+          label: "Finding the launch moment",
+          queries: [
+            `${name} startup ProductHunt launch`,
+            `${name} TechCrunch launch announcement`,
+            `${name} startup Series A funding announcement`,
+            `${name} YCombinator demo day launch`,
+            `${name} startup first product release`,
+          ],
+        },
+        {
+          label: "Reading the obituary",
+          queries: [
+            `${name} startup shutdown closed`,
+            `${name} company failed obituary`,
+            `${name} startup why we shut down`,
+            `${name} startup discontinue cease operations`,
+            `${name} startup post-mortem analysis`,
+          ],
+        },
+        {
+          label: "Finding founder's last words",
+          queries: [
+            `${name} founder statement why we failed`,
+            `${name} CEO blog post shutdown`,
+            `${name} founder lessons learned failure`,
+            `${name} startup post-mortem blog`,
+          ],
+        },
       ]
-      const labels = ["wikipedia", "launch", "death", "postmortem"]
+
       const results: string[] = []
 
-      for (let i = 0; i < queries.length; i++) {
-        const { query, label } = queries[i]
-        
-        // Send "searching" status
+      for (let i = 0; i < steps.length; i++) {
+        const { label, queries } = steps[i]
+        const sources: SearchSource[] = queries.map((q) => ({
+          url: "",
+          title: q.slice(0, 50) + (q.length > 50 ? "..." : ""),
+          snippet: "",
+          status: "searching" as const,
+        }))
+
+        // Send initial "searching" status with all queries
         send({
           type: "step",
           index: i,
           label,
           status: "searching",
-          query: query.slice(0, 60) + (query.length > 60 ? "..." : ""),
+          sources,
         })
 
-        try {
-          const response = await firecrawl.search(query, {
-            limit: 2,
-            scrapeOptions: { formats: ["markdown"] },
-          })
-          const items = response.web
+        let combinedText = ""
+        const foundSources: SearchSource[] = []
+
+        // Search each query in the step
+        for (let j = 0; j < queries.length; j++) {
+          const query = queries[j]
           
-          if (items && items.length > 0) {
-            const text = items
-              .map((r) => ("markdown" in r && r.markdown) || "")
-              .join("\n\n")
-            results[i] = text
-            
-            // Extract a snippet for display
-            const snippet = text.slice(0, 100).replace(/\n/g, " ").trim() + "..."
-            
-            send({
-              type: "step",
-              index: i,
-              label,
-              status: "found",
-              resultCount: items.length,
-              snippet,
+          try {
+            const response = await firecrawl.search(query, {
+              limit: 1,
+              scrapeOptions: { formats: ["markdown"] },
             })
-          } else {
-            results[i] = ""
-            send({
-              type: "step",
-              index: i,
-              label,
+            const items = response.web
+
+            if (items && items.length > 0) {
+              const item = items[0]
+              const text = ("markdown" in item && item.markdown) || ""
+              const itemUrl = ("url" in item && item.url) || ""
+              const itemTitle = ("title" in item && item.title) || query
+              
+              combinedText += text + "\n\n"
+              
+              foundSources.push({
+                url: itemUrl,
+                title: itemTitle.slice(0, 60) + (itemTitle.length > 60 ? "..." : ""),
+                snippet: text.slice(0, 80).replace(/\n/g, " ").trim() + "...",
+                status: "found",
+              })
+            } else {
+              foundSources.push({
+                url: "",
+                title: query.slice(0, 50) + (query.length > 50 ? "..." : ""),
+                snippet: "No results found",
+                status: "not_found",
+              })
+            }
+          } catch (err) {
+            console.log(`[research] [${label}] Query "${query}" failed:`, err)
+            foundSources.push({
+              url: "",
+              title: query.slice(0, 50) + (query.length > 50 ? "..." : ""),
+              snippet: "Search failed",
               status: "not_found",
             })
           }
-        } catch (err) {
-          console.log(`[research] [${labels[i]}] Search failed:`, err)
-          results[i] = ""
+
+          // Send progress update after each query
+          const foundCount = foundSources.filter((s) => s.status === "found").length
           send({
             type: "step",
             index: i,
             label,
-            status: "not_found",
+            status: foundCount > 0 ? "found" : "searching",
+            sources: [
+              ...foundSources,
+              ...queries.slice(j + 1).map((q) => ({
+                url: "",
+                title: q.slice(0, 50) + (q.length > 50 ? "..." : ""),
+                snippet: "",
+                status: "searching" as const,
+              })),
+            ],
           })
         }
+
+        results[i] = combinedText
+        const finalFoundCount = foundSources.filter((s) => s.status === "found").length
+
+        // Send final status for this step
+        send({
+          type: "step",
+          index: i,
+          label,
+          status: finalFoundCount > 0 ? "found" : "not_found",
+          sources: foundSources,
+        })
       }
 
       const [wikipedia, launch, death, postmortem] = results.map((r) => truncate(r))
