@@ -5,12 +5,7 @@ import { useConversation } from "@elevenlabs/react"
 import { Mic, Check, ArrowLeft, Copy, RotateCcw, Search, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { buildEulogyPrompt, type Research } from "@/lib/buildEulogyPrompt"
-import {
-  Task,
-  TaskTrigger,
-  TaskContent,
-  TaskItem,
-} from "@/components/ai-elements/task"
+
 import type { ResearchEvent } from "@/app/api/research/route"
 
 type ViewState = "researching" | "ready" | "live" | "eulogy"
@@ -369,76 +364,66 @@ export default function Conversation({ name, years, url, agentId }: Conversation
 
           <div className="my-8 h-px w-full max-w-md bg-border" />
 
-          <div className="w-full max-w-md space-y-3">
+          <div className="w-full max-w-md space-y-4">
             {researchSteps.map((step, i) => {
               const foundCount = step.sources.filter((s) => s.status === "found").length
+              const isActive = step.status === "searching" || step.status === "found"
               return (
-                <Task key={i} defaultOpen={step.status === "searching"}>
-                  <TaskTrigger title="">
-                    <div className="flex w-full cursor-pointer items-center gap-3 text-sm transition-colors hover:text-foreground">
-                      {step.status === "pending" && (
-                        <span className="flex size-5 items-center justify-center">
-                          <span className="size-2 rounded-full border border-ghost" />
-                        </span>
-                      )}
-                      {step.status === "searching" && (
-                        <Loader2 className="size-4 animate-spin text-live" />
-                      )}
-                      {step.status === "found" && (
-                        <span className="flex size-5 items-center justify-center rounded-full bg-live/10">
-                          <Check className="size-3 text-live" strokeWidth={2.5} />
-                        </span>
-                      )}
-                      {step.status === "not_found" && (
-                        <span className="flex size-5 items-center justify-center rounded-full bg-muted">
-                          <span className="size-2 rounded-full bg-muted-foreground" />
-                        </span>
-                      )}
-                      <span className={step.status === "pending" ? "text-ghost" : "text-foreground"}>
-                        {step.label}
+                <div key={i} className="space-y-2">
+                  <div className="flex items-center gap-3 text-sm">
+                    {step.status === "pending" && (
+                      <span className="flex size-4 items-center justify-center">
+                        <span className="size-1.5 rounded-full bg-ghost" />
                       </span>
-                      {foundCount > 0 && (
-                        <span className="ml-auto rounded-full bg-live/10 px-2 py-0.5 font-mono text-[10px] text-live">
-                          {foundCount} found
-                        </span>
-                      )}
-                    </div>
-                  </TaskTrigger>
-                  {step.sources.length > 0 && (
-                    <TaskContent>
+                    )}
+                    {step.status === "searching" && (
+                      <Loader2 className="size-4 animate-spin text-live" />
+                    )}
+                    {step.status === "found" && (
+                      <Check className="size-4 text-live" strokeWidth={2.5} />
+                    )}
+                    {step.status === "not_found" && (
+                      <span className="size-4 flex items-center justify-center">
+                        <span className="size-1.5 rounded-full bg-muted-foreground" />
+                      </span>
+                    )}
+                    <span className={step.status === "pending" ? "text-ghost" : "text-foreground font-medium"}>
+                      {step.label}
+                    </span>
+                    {foundCount > 0 && (
+                      <span className="ml-auto font-mono text-[10px] text-live">
+                        {foundCount} sources
+                      </span>
+                    )}
+                  </div>
+                  {isActive && step.sources.length > 0 && (
+                    <div className="ml-7 flex flex-wrap gap-2">
                       {step.sources.map((source, j) => (
-                        <TaskItem key={j}>
-                          <div className="flex items-start gap-2">
-                            {source.status === "searching" && (
-                              <Loader2 className="mt-0.5 size-3 shrink-0 animate-spin text-muted-foreground" />
-                            )}
-                            {source.status === "found" && (
-                              <Check className="mt-0.5 size-3 shrink-0 text-live" strokeWidth={2.5} />
-                            )}
-                            {source.status === "not_found" && (
-                              <span className="mt-1 size-2 shrink-0 rounded-full bg-muted-foreground/50" />
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate font-mono text-xs text-foreground">
-                                {source.title}
-                              </p>
-                              {source.snippet && source.status === "found" && (
-                                <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                                  {source.snippet}
-                                </p>
-                              )}
-                              {source.url && (
-                                <p className="mt-0.5 truncate text-[10px] text-ghost">
-                                  {source.url}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </TaskItem>
+                        <a
+                          key={j}
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[11px] transition-colors ${
+                            source.status === "found"
+                              ? "border-live/30 bg-live/5 text-live hover:bg-live/10"
+                              : source.status === "searching"
+                              ? "border-border bg-muted text-muted-foreground animate-pulse"
+                              : "border-border bg-muted/50 text-ghost"
+                          }`}
+                        >
+                          {source.status === "searching" && (
+                            <Loader2 className="size-3 animate-spin" />
+                          )}
+                          {source.status === "found" && (
+                            <Check className="size-3" strokeWidth={2.5} />
+                          )}
+                          {source.title}
+                        </a>
                       ))}
-                    </TaskContent>
+                    </div>
                   )}
-                </Task>
+                </div>
               )
             })}
           </div>
@@ -470,55 +455,37 @@ export default function Conversation({ name, years, url, agentId }: Conversation
 
           <div className="my-8 h-px w-full max-w-md bg-border" />
 
-          <div className="w-full max-w-md space-y-2">
+          <div className="w-full max-w-md space-y-4">
             {researchSteps.map((step, i) => {
-              const foundCount = step.sources.filter((s) => s.status === "found").length
+              const foundSources = step.sources.filter((s) => s.status === "found")
               return (
-                <Task key={i}>
-                  <TaskTrigger title="">
-                    <div className="flex w-full cursor-pointer items-center gap-3 text-sm transition-colors hover:text-foreground">
-                      <span className="flex size-5 items-center justify-center rounded-full bg-live/10">
-                        <Check className="size-3 text-live" strokeWidth={2.5} />
+                <div key={i} className="space-y-2">
+                  <div className="flex items-center gap-3 text-sm">
+                    <Check className="size-4 text-live" strokeWidth={2.5} />
+                    <span className="font-medium text-foreground">{step.label}</span>
+                    {foundSources.length > 0 && (
+                      <span className="ml-auto font-mono text-[10px] text-live">
+                        {foundSources.length} sources
                       </span>
-                      <span className="text-foreground">{step.label}</span>
-                      {foundCount > 0 && (
-                        <span className="ml-auto rounded-full bg-live/10 px-2 py-0.5 font-mono text-[10px] text-live">
-                          {foundCount} found
-                        </span>
-                      )}
-                    </div>
-                  </TaskTrigger>
-                  {step.sources.length > 0 && (
-                    <TaskContent>
-                      {step.sources.map((source, j) => (
-                        <TaskItem key={j}>
-                          <div className="flex items-start gap-2">
-                            {source.status === "found" ? (
-                              <Check className="mt-0.5 size-3 shrink-0 text-live" strokeWidth={2.5} />
-                            ) : (
-                              <span className="mt-1 size-2 shrink-0 rounded-full bg-muted-foreground/50" />
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate font-mono text-xs text-foreground">
-                                {source.title}
-                              </p>
-                              {source.snippet && source.status === "found" && (
-                                <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                                  {source.snippet}
-                                </p>
-                              )}
-                              {source.url && (
-                                <p className="mt-0.5 truncate text-[10px] text-ghost">
-                                  {source.url}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </TaskItem>
+                    )}
+                  </div>
+                  {foundSources.length > 0 && (
+                    <div className="ml-7 flex flex-wrap gap-2">
+                      {foundSources.map((source, j) => (
+                        <a
+                          key={j}
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-md border border-live/30 bg-live/5 px-2 py-1 font-mono text-[11px] text-live transition-colors hover:bg-live/10"
+                        >
+                          <Check className="size-3" strokeWidth={2.5} />
+                          {source.title}
+                        </a>
                       ))}
-                    </TaskContent>
+                    </div>
                   )}
-                </Task>
+                </div>
               )
             })}
           </div>
