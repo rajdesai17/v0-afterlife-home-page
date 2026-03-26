@@ -362,92 +362,94 @@ export default function Conversation({ name, years, url, agentId }: Conversation
             <p className="mt-2 font-mono text-sm text-muted-foreground">{years}</p>
           )}
 
-          <div className="my-8 h-px w-full max-w-md bg-border" />
+          <div className="my-6 h-px w-full max-w-md bg-border" />
 
-          <div className="w-full max-w-md space-y-4">
-            {researchSteps.map((step, i) => {
-              const foundCount = step.sources.filter((s) => s.status === "found").length
-              const isActive = step.status === "searching" || step.status === "found"
-              return (
-                <div key={i} className="space-y-2">
-                  <div className="flex items-center gap-3 text-sm">
-                    {step.status === "pending" && (
-                      <span className="flex size-4 items-center justify-center">
-                        <span className="size-1.5 rounded-full bg-ghost" />
+          <div className="w-full max-w-md overflow-y-auto rounded-lg border border-border bg-card/50 p-3" style={{ maxHeight: "45vh" }}>
+            <div className="space-y-3">
+              {researchSteps.map((step, i) => {
+                const foundCount = step.sources.filter((s) => s.status === "found").length
+                const isActive = step.status === "searching" || step.status === "found"
+                return (
+                  <div key={i} className="space-y-1.5">
+                    <div className="flex items-center gap-2.5 text-sm">
+                      {step.status === "pending" && (
+                        <span className="flex size-4 items-center justify-center">
+                          <span className="size-1.5 rounded-full bg-ghost" />
+                        </span>
+                      )}
+                      {step.status === "searching" && (
+                        <Loader2 className="size-4 animate-spin text-live" />
+                      )}
+                      {step.status === "found" && (
+                        <Check className="size-4 text-live" strokeWidth={2.5} />
+                      )}
+                      {step.status === "not_found" && (
+                        <span className="size-4 flex items-center justify-center">
+                          <span className="size-1.5 rounded-full bg-muted-foreground" />
+                        </span>
+                      )}
+                      <span className={step.status === "pending" ? "text-ghost" : "text-foreground font-medium"}>
+                        {step.label}
                       </span>
-                    )}
-                    {step.status === "searching" && (
-                      <Loader2 className="size-4 animate-spin text-live" />
-                    )}
-                    {step.status === "found" && (
-                      <Check className="size-4 text-live" strokeWidth={2.5} />
-                    )}
-                    {step.status === "not_found" && (
-                      <span className="size-4 flex items-center justify-center">
-                        <span className="size-1.5 rounded-full bg-muted-foreground" />
-                      </span>
-                    )}
-                    <span className={step.status === "pending" ? "text-ghost" : "text-foreground font-medium"}>
-                      {step.label}
-                    </span>
-                    {foundCount > 0 && (
-                      <span className="ml-auto font-mono text-[10px] text-live">
-                        {foundCount} sources
-                      </span>
+                      {foundCount > 0 && (
+                        <span className="ml-auto font-mono text-[10px] text-live">
+                          {foundCount} sources
+                        </span>
+                      )}
+                    </div>
+                    {isActive && step.sources.length > 0 && (
+                      <div className="ml-6 flex flex-col">
+                        {step.sources.map((source, j) => {
+                          let domain = source.url
+                          try {
+                            const urlObj = new URL(source.url)
+                            domain = urlObj.hostname.replace("www.", "")
+                          } catch {
+                            domain = source.url
+                          }
+                          return (
+                            <a
+                              key={j}
+                              href={source.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`flex items-center gap-2 rounded px-2 py-1 text-xs transition-colors hover:bg-muted/50 ${
+                                source.status === "searching"
+                                  ? "animate-pulse"
+                                  : source.status === "not_found"
+                                  ? "opacity-40"
+                                  : ""
+                              }`}
+                            >
+                              {source.status === "searching" ? (
+                                <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+                              ) : (
+                                <img
+                                  src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                                  alt=""
+                                  className={`size-3.5 shrink-0 rounded-sm ${source.status === "not_found" ? "opacity-30 grayscale" : ""}`}
+                                />
+                              )}
+                              <span className={`min-w-0 flex-1 truncate ${
+                                source.status === "found" ? "text-foreground" : "text-muted-foreground"
+                              }`}>
+                                {source.title}
+                              </span>
+                              <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                                {domain}
+                              </span>
+                            </a>
+                          )
+                        })}
+                      </div>
                     )}
                   </div>
-                  {isActive && step.sources.length > 0 && (
-                    <div className="ml-7 flex flex-col gap-1">
-                      {step.sources.map((source, j) => {
-                        let domain = source.url
-                        try {
-                          const urlObj = new URL(source.url)
-                          domain = urlObj.hostname.replace("www.", "")
-                        } catch {
-                          domain = source.url
-                        }
-                        return (
-                          <a
-                            key={j}
-                            href={source.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-muted/50 ${
-                              source.status === "searching"
-                                ? "animate-pulse"
-                                : source.status === "not_found"
-                                ? "opacity-40"
-                                : ""
-                            }`}
-                          >
-                            {source.status === "searching" ? (
-                              <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
-                            ) : (
-                              <img
-                                src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
-                                alt=""
-                                className={`size-4 shrink-0 rounded-sm ${source.status === "not_found" ? "opacity-30 grayscale" : ""}`}
-                              />
-                            )}
-                            <span className={`min-w-0 flex-1 truncate ${
-                              source.status === "found" ? "text-foreground" : "text-muted-foreground"
-                            }`}>
-                              {source.title}
-                            </span>
-                            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-                              {domain}
-                            </span>
-                          </a>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
 
-          <p className="mt-8 font-mono text-xs text-ghost">
+          <p className="mt-6 font-mono text-xs text-ghost">
             Gathering memories...
           </p>
         </div>
@@ -455,7 +457,7 @@ export default function Conversation({ name, years, url, agentId }: Conversation
 
       {/* Ready state */}
       {view === "ready" && (
-        <div className="flex flex-1 flex-col items-center px-4 pt-28">
+        <div className="flex flex-1 flex-col items-center px-4 pt-24">
           <Link
             href="/"
             className="mb-8 flex items-center gap-2 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
@@ -472,59 +474,61 @@ export default function Conversation({ name, years, url, agentId }: Conversation
             <p className="mt-2 font-mono text-sm text-muted-foreground">{years}</p>
           )}
 
-          <div className="my-8 h-px w-full max-w-md bg-border" />
+          <div className="my-6 h-px w-full max-w-md bg-border" />
 
-          <div className="w-full max-w-md space-y-4">
-            {researchSteps.map((step, i) => {
-              const foundSources = step.sources.filter((s) => s.status === "found")
-              return (
-                <div key={i} className="space-y-2">
-                  <div className="flex items-center gap-3 text-sm">
-                    <Check className="size-4 text-live" strokeWidth={2.5} />
-                    <span className="font-medium text-foreground">{step.label}</span>
+          <div className="w-full max-w-md overflow-y-auto rounded-lg border border-border bg-card/50 p-3" style={{ maxHeight: "40vh" }}>
+            <div className="space-y-3">
+              {researchSteps.map((step, i) => {
+                const foundSources = step.sources.filter((s) => s.status === "found")
+                return (
+                  <div key={i} className="space-y-1.5">
+                    <div className="flex items-center gap-2.5 text-sm">
+                      <Check className="size-4 text-live" strokeWidth={2.5} />
+                      <span className="font-medium text-foreground">{step.label}</span>
+                      {foundSources.length > 0 && (
+                        <span className="ml-auto font-mono text-[10px] text-live">
+                          {foundSources.length} sources
+                        </span>
+                      )}
+                    </div>
                     {foundSources.length > 0 && (
-                      <span className="ml-auto font-mono text-[10px] text-live">
-                        {foundSources.length} sources
-                      </span>
+                      <div className="ml-6 flex flex-col">
+                        {foundSources.map((source, j) => {
+                          let domain = source.url
+                          try {
+                            const urlObj = new URL(source.url)
+                            domain = urlObj.hostname.replace("www.", "")
+                          } catch {
+                            domain = source.url
+                          }
+                          return (
+                            <a
+                              key={j}
+                              href={source.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 rounded px-2 py-1 text-xs transition-colors hover:bg-muted/50"
+                            >
+                              <img
+                                src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                                alt=""
+                                className="size-3.5 shrink-0 rounded-sm"
+                              />
+                              <span className="min-w-0 flex-1 truncate text-foreground">
+                                {source.title}
+                              </span>
+                              <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                                {domain}
+                              </span>
+                            </a>
+                          )
+                        })}
+                      </div>
                     )}
                   </div>
-                  {foundSources.length > 0 && (
-                    <div className="ml-7 flex flex-col gap-1">
-                      {foundSources.map((source, j) => {
-                        let domain = source.url
-                        try {
-                          const urlObj = new URL(source.url)
-                          domain = urlObj.hostname.replace("www.", "")
-                        } catch {
-                          domain = source.url
-                        }
-                        return (
-                          <a
-                            key={j}
-                            href={source.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-muted/50"
-                          >
-                            <img
-                              src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
-                              alt=""
-                              className="size-4 shrink-0 rounded-sm"
-                            />
-                            <span className="min-w-0 flex-1 truncate text-foreground">
-                              {source.title}
-                            </span>
-                            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-                              {domain}
-                            </span>
-                          </a>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
 
           <button
