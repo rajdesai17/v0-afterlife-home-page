@@ -65,6 +65,8 @@ export default function Conversation({ name, years, url, agentId }: Conversation
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [isStartingSession, setIsStartingSession] = useState(false)
+  const [epitaph, setEpitaph] = useState<string | null>(null)
+  const [isLoadingEpitaph, setIsLoadingEpitaph] = useState(false)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const researchRef = useRef<Research | null>(null)
@@ -151,6 +153,38 @@ export default function Conversation({ name, years, url, agentId }: Conversation
       }
     }
   }, [view, startTime])
+
+  // Fetch epitaph when entering eulogy state
+  useEffect(() => {
+    if (view !== "eulogy" || epitaph || isLoadingEpitaph) return
+
+    async function fetchEpitaph() {
+      setIsLoadingEpitaph(true)
+      try {
+        const research = researchRef.current
+        const context = research
+          ? `${research.wikipedia?.slice(0, 300) || ""} ${research.death?.slice(0, 200) || ""}`
+          : ""
+
+        const res = await fetch("/api/epitaph", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, years, context }),
+        })
+
+        if (res.ok) {
+          const data = await res.json()
+          setEpitaph(data.epitaph)
+        }
+      } catch (err) {
+        console.error("Failed to fetch epitaph:", err)
+      } finally {
+        setIsLoadingEpitaph(false)
+      }
+    }
+
+    fetchEpitaph()
+  }, [view, name, years, epitaph, isLoadingEpitaph])
 
   useEffect(() => {
     if (didStartResearch.current) return
@@ -468,9 +502,20 @@ export default function Conversation({ name, years, url, agentId }: Conversation
               <p className="mt-1 font-mono text-sm text-muted-foreground">{years}</p>
             )}
 
+            {/* Epitaph - startup's self-description */}
+            {isLoadingEpitaph ? (
+              <p className="mt-4 text-sm italic text-muted-foreground animate-pulse">
+                Composing final words...
+              </p>
+            ) : epitaph ? (
+              <p className="mt-4 text-sm italic text-muted-foreground">
+                &ldquo;{epitaph}&rdquo;
+              </p>
+            ) : null}
+
             {pullQuote && (
               <blockquote className="my-8 border-l-2 border-live pl-4 text-[15px] italic leading-relaxed text-foreground">
-                "{pullQuote}"
+                &ldquo;{pullQuote}&rdquo;
               </blockquote>
             )}
 
