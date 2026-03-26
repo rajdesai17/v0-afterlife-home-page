@@ -2,15 +2,25 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useConversation } from "@elevenlabs/react"
-import { Mic, Check, ArrowLeft, Copy, RotateCcw } from "lucide-react"
+import { Mic, Check, ArrowLeft, Copy, RotateCcw, Search, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { buildEulogyPrompt, type Research } from "@/lib/buildEulogyPrompt"
+import {
+  Task,
+  TaskTrigger,
+  TaskContent,
+  TaskItem,
+} from "@/components/ai-elements/task"
+import type { ResearchEvent } from "@/app/api/research/route"
 
 type ViewState = "researching" | "ready" | "live" | "eulogy"
 
-interface ResearchItem {
+interface ResearchStep {
   label: string
-  status: "pending" | "active" | "done"
+  status: "pending" | "searching" | "found" | "not_found"
+  query?: string
+  snippet?: string
+  resultCount?: number
 }
 
 interface TranscriptMessage {
@@ -26,32 +36,9 @@ interface ConversationProps {
   agentId: string
 }
 
-function StatusIndicator({ status }: { status: ResearchItem["status"] }) {
-  if (status === "done") {
-    return (
-      <span className="flex size-5 items-center justify-center rounded-full bg-live/10">
-        <Check className="size-3 text-live" strokeWidth={2.5} />
-      </span>
-    )
-  }
-  if (status === "active") {
-    return (
-      <span className="relative flex size-5 items-center justify-center">
-        <span className="absolute size-2.5 animate-ping rounded-full bg-live opacity-50" />
-        <span className="size-2 rounded-full bg-live" />
-      </span>
-    )
-  }
-  return (
-    <span className="flex size-5 items-center justify-center">
-      <span className="size-2 rounded-full border border-ghost" />
-    </span>
-  )
-}
-
 export default function Conversation({ name, years, url, agentId }: ConversationProps) {
   const [view, setView] = useState<ViewState>("researching")
-  const [researchItems, setResearchItems] = useState<ResearchItem[]>([
+  const [researchSteps, setResearchSteps] = useState<ResearchStep[]>([
     { label: "Reading Wikipedia", status: "pending" },
     { label: "Finding the launch moment", status: "pending" },
     { label: "Reading the obituary", status: "pending" },
@@ -191,41 +178,78 @@ export default function Conversation({ name, years, url, agentId }: Conversation
     didStartResearch.current = true
 
     async function doSetup() {
-      setResearchItems((items) =>
-        items.map((item) => ({ ...item, status: "active" as const }))
-      )
-
       try {
-        const [researchRes, signedUrlRes] = await Promise.all([
-          fetch("/api/research", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name, url }),
-          }),
+        // Start parallel: signed URL fetch, mic permission, and research stream
+        const [signedUrlRes] = await Promise.all([
           fetch("/api/signed-url", { method: "POST" }),
           navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
             stream.getTracks().forEach((t) => t.stop())
           }).catch(() => {}),
         ])
 
-        if (!researchRes.ok) throw new Error("Research failed")
         if (!signedUrlRes.ok) throw new Error("Failed to get signed URL")
-
-        const [research, { signedUrl: fetchedSignedUrl }] = await Promise.all([
-          researchRes.json() as Promise<Research>,
-          signedUrlRes.json() as Promise<{ signedUrl: string }>,
-        ])
-
-        researchRef.current = research
+        const { signedUrl: fetchedSignedUrl } = await signedUrlRes.json()
         signedUrlRef.current = fetchedSignedUrl
 
-        setResearchItems((items) =>
-          items.map((item) => ({ ...item, status: "done" as const }))
-        )
+        // Start streaming research
+        const researchRes = await fetch("/api/research", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, url }),
+        })
 
-        const p = buildEulogyPrompt(name, research, years || undefined)
-        setPrompt(p)
-        setView("ready")
+        if (!researchRes.ok) throw new Error("Research failed")
+        if (!researchRes.body) throw new Error("No response body")
+
+        const reader = researchRes.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split("\n\n")
+          buffer = lines.pop() || ""
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue
+            const json = line.slice(6)
+            try {
+              const event = JSON.parse(json) as ResearchEvent
+
+              if (event.type === "step") {
+                setResearchSteps((prev) => {
+                  const updated = [...prev]
+                  updated[event.index] = {
+                    label: event.label,
+                    status: event.status,
+                    query: event.query,
+                    snippet: event.snippet,
+                    resultCount: event.resultCount,
+                  }
+                  return updated
+                })
+              } else if (event.type === "complete") {
+                const research: Research = {
+                  wikipedia: event.wikipedia,
+                  launch: event.launch,
+                  death: event.death,
+                  postmortem: event.postmortem,
+                  foundedYear: event.foundedYear,
+                  diedYear: event.diedYear,
+                }
+                researchRef.current = research
+                const p = buildEulogyPrompt(name, research, years || undefined)
+                setPrompt(p)
+                setView("ready")
+              }
+            } catch (e) {
+              console.error("[research] Failed to parse event:", e)
+            }
+          }
+        }
       } catch (err) {
         console.error("[client] Error:", err)
         setError(err instanceof Error ? err.message : "Something went wrong")
@@ -323,7 +347,7 @@ export default function Conversation({ name, years, url, agentId }: Conversation
     <main className="flex min-h-screen flex-col bg-background">
       {/* Researching state */}
       {view === "researching" && (
-        <div className="flex flex-1 flex-col items-center px-4 pt-20">
+        <div className="flex flex-1 flex-col items-center px-4 pt-28">
           <Link
             href="/"
             className="mb-8 flex items-center gap-2 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
@@ -340,26 +364,65 @@ export default function Conversation({ name, years, url, agentId }: Conversation
             <p className="mt-2 font-mono text-sm text-muted-foreground">{years}</p>
           )}
 
-          <div className="my-10 h-px w-full max-w-xs bg-border" />
+          <div className="my-8 h-px w-full max-w-md bg-border" />
 
-          <div className="flex w-full max-w-sm flex-col gap-4">
-            {researchItems.map((item, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <StatusIndicator status={item.status} />
-                <span
-                  className={`text-sm ${
-                    item.status === "pending"
-                      ? "text-ghost"
-                      : "text-foreground"
-                  }`}
-                >
-                  {item.label}
-                </span>
-              </div>
+          <div className="w-full max-w-md space-y-3">
+            {researchSteps.map((step, i) => (
+              <Task key={i} defaultOpen={step.status === "searching" || step.status === "found"}>
+                <TaskTrigger title="">
+                  <div className="flex w-full cursor-pointer items-center gap-3 text-sm transition-colors hover:text-foreground">
+                    {step.status === "pending" && (
+                      <span className="flex size-5 items-center justify-center">
+                        <span className="size-2 rounded-full border border-ghost" />
+                      </span>
+                    )}
+                    {step.status === "searching" && (
+                      <Loader2 className="size-4 animate-spin text-live" />
+                    )}
+                    {step.status === "found" && (
+                      <span className="flex size-5 items-center justify-center rounded-full bg-live/10">
+                        <Check className="size-3 text-live" strokeWidth={2.5} />
+                      </span>
+                    )}
+                    {step.status === "not_found" && (
+                      <span className="flex size-5 items-center justify-center rounded-full bg-muted">
+                        <span className="size-2 rounded-full bg-muted-foreground" />
+                      </span>
+                    )}
+                    <span className={step.status === "pending" ? "text-ghost" : "text-foreground"}>
+                      {step.label}
+                    </span>
+                    {step.status === "found" && step.resultCount && (
+                      <span className="ml-auto rounded-full bg-live/10 px-2 py-0.5 font-mono text-[10px] text-live">
+                        {step.resultCount} found
+                      </span>
+                    )}
+                  </div>
+                </TaskTrigger>
+                {(step.query || step.snippet) && (
+                  <TaskContent>
+                    {step.query && (
+                      <TaskItem>
+                        <span className="flex items-center gap-2 text-muted-foreground">
+                          <Search className="size-3" />
+                          <span className="font-mono text-xs">{step.query}</span>
+                        </span>
+                      </TaskItem>
+                    )}
+                    {step.snippet && (
+                      <TaskItem>
+                        <p className="text-xs text-muted-foreground italic line-clamp-2">
+                          {step.snippet}
+                        </p>
+                      </TaskItem>
+                    )}
+                  </TaskContent>
+                )}
+              </Task>
             ))}
           </div>
 
-          <p className="mt-10 font-mono text-xs text-ghost">
+          <p className="mt-8 font-mono text-xs text-ghost">
             Gathering memories...
           </p>
         </div>
@@ -367,7 +430,7 @@ export default function Conversation({ name, years, url, agentId }: Conversation
 
       {/* Ready state */}
       {view === "ready" && (
-        <div className="flex flex-1 flex-col items-center px-4 pt-20">
+        <div className="flex flex-1 flex-col items-center px-4 pt-28">
           <Link
             href="/"
             className="mb-8 flex items-center gap-2 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
@@ -384,13 +447,20 @@ export default function Conversation({ name, years, url, agentId }: Conversation
             <p className="mt-2 font-mono text-sm text-muted-foreground">{years}</p>
           )}
 
-          <div className="my-10 h-px w-full max-w-xs bg-border" />
+          <div className="my-8 h-px w-full max-w-md bg-border" />
 
-          <div className="flex w-full max-w-sm flex-col gap-4">
-            {researchItems.map((item, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <StatusIndicator status={item.status} />
-                <span className="text-sm text-foreground">{item.label}</span>
+          <div className="w-full max-w-md space-y-2">
+            {researchSteps.map((step, i) => (
+              <div key={i} className="flex items-center gap-3 text-sm">
+                <span className="flex size-5 items-center justify-center rounded-full bg-live/10">
+                  <Check className="size-3 text-live" strokeWidth={2.5} />
+                </span>
+                <span className="text-foreground">{step.label}</span>
+                {step.resultCount && (
+                  <span className="ml-auto rounded-full bg-live/10 px-2 py-0.5 font-mono text-[10px] text-live">
+                    {step.resultCount} found
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -399,7 +469,7 @@ export default function Conversation({ name, years, url, agentId }: Conversation
             type="button"
             onClick={startConversation}
             disabled={isStartingSession}
-            className="mt-12 rounded-lg bg-primary px-8 py-3 font-sans text-sm font-medium text-primary-foreground transition-all hover:opacity-90 disabled:opacity-50"
+            className="mt-10 rounded-lg bg-primary px-8 py-3 font-sans text-sm font-medium text-primary-foreground transition-all hover:opacity-90 disabled:opacity-50"
           >
             {isStartingSession ? "Connecting..." : "Start conversation"}
           </button>
