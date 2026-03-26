@@ -508,16 +508,10 @@ export default function Conversation({ name, years, url, agentId }: Conversation
                 Composing final words...
               </p>
             ) : epitaph ? (
-              <p className="mt-4 text-sm italic text-muted-foreground">
+              <p className="mt-4 mb-6 text-sm italic text-muted-foreground">
                 &ldquo;{epitaph}&rdquo;
               </p>
             ) : null}
-
-            {pullQuote && (
-              <blockquote className="my-8 border-l-2 border-live pl-4 text-[15px] italic leading-relaxed text-foreground">
-                &ldquo;{pullQuote}&rdquo;
-              </blockquote>
-            )}
 
             {/* Stats */}
             <div className="flex flex-wrap gap-2">
