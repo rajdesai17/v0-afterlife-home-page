@@ -110,7 +110,7 @@ lib/
 
 ## Credits
 
-Built by [@rajoninternet](https://twitter.com/rajoninternet) for ElevenLabs Hackathon 2025.
+Built by [@rajoninternet](https://twitter.com/rajoninternet) for ElevenHacks 2026.
 
 Powered by:
 - [ElevenLabs](https://elevenlabs.io) — Voice AI
