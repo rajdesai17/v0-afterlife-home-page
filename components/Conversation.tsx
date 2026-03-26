@@ -397,30 +397,40 @@ export default function Conversation({ name, years, url, agentId }: Conversation
                     )}
                   </div>
                   {isActive && step.sources.length > 0 && (
-                    <div className="ml-7 flex flex-wrap gap-2">
-                      {step.sources.map((source, j) => (
-                        <a
-                          key={j}
-                          href={source.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[11px] transition-colors ${
-                            source.status === "found"
-                              ? "border-live/30 bg-live/5 text-live hover:bg-live/10"
-                              : source.status === "searching"
-                              ? "border-border bg-muted text-muted-foreground animate-pulse"
-                              : "border-border bg-muted/50 text-ghost"
-                          }`}
-                        >
-                          {source.status === "searching" && (
-                            <Loader2 className="size-3 animate-spin" />
-                          )}
-                          {source.status === "found" && (
-                            <Check className="size-3" strokeWidth={2.5} />
-                          )}
-                          {source.title}
-                        </a>
-                      ))}
+                    <div className="ml-7 flex flex-wrap gap-1.5">
+                      {step.sources.map((source, j) => {
+                        // Extract domain from URL for display
+                        let displayUrl = source.url
+                        try {
+                          const urlObj = new URL(source.url)
+                          displayUrl = urlObj.hostname.replace("www.", "")
+                        } catch {
+                          displayUrl = source.url
+                        }
+                        return (
+                          <a
+                            key={j}
+                            href={source.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 font-mono text-[10px] transition-colors ${
+                              source.status === "found"
+                                ? "border-live/30 bg-live/5 text-live hover:bg-live/10"
+                                : source.status === "searching"
+                                ? "border-border bg-muted text-muted-foreground animate-pulse"
+                                : "border-border bg-muted/50 text-ghost line-through"
+                            }`}
+                          >
+                            {source.status === "searching" && (
+                              <Loader2 className="size-2.5 animate-spin" />
+                            )}
+                            {source.status === "found" && (
+                              <Check className="size-2.5" strokeWidth={3} />
+                            )}
+                            {displayUrl}
+                          </a>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
@@ -470,19 +480,28 @@ export default function Conversation({ name, years, url, agentId }: Conversation
                     )}
                   </div>
                   {foundSources.length > 0 && (
-                    <div className="ml-7 flex flex-wrap gap-2">
-                      {foundSources.map((source, j) => (
-                        <a
-                          key={j}
-                          href={source.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 rounded-md border border-live/30 bg-live/5 px-2 py-1 font-mono text-[11px] text-live transition-colors hover:bg-live/10"
-                        >
-                          <Check className="size-3" strokeWidth={2.5} />
-                          {source.title}
-                        </a>
-                      ))}
+                    <div className="ml-7 flex flex-wrap gap-1.5">
+                      {foundSources.map((source, j) => {
+                        let displayUrl = source.url
+                        try {
+                          const urlObj = new URL(source.url)
+                          displayUrl = urlObj.hostname.replace("www.", "")
+                        } catch {
+                          displayUrl = source.url
+                        }
+                        return (
+                          <a
+                            key={j}
+                            href={source.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-full border border-live/30 bg-live/5 px-2.5 py-0.5 font-mono text-[10px] text-live transition-colors hover:bg-live/10"
+                          >
+                            <Check className="size-2.5" strokeWidth={3} />
+                            {displayUrl}
+                          </a>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
