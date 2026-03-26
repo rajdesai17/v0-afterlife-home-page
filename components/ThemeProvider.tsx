@@ -21,13 +21,13 @@ export function useTheme() {
 }
 
 function getSystemTheme(): "light" | "dark" {
-  if (typeof window === "undefined") return "dark"
+  if (typeof window === "undefined") return "light"
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("system")
-  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("dark")
+  const [theme, setThemeState] = useState<Theme>("light")
+  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light")
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -73,7 +73,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Prevent hydration mismatch by rendering with default until mounted
   if (!mounted) {
     return (
-      <ThemeContext.Provider value={{ theme: "system", setTheme: () => {}, resolvedTheme: "dark" }}>
+      <ThemeContext.Provider value={{ theme: "light", setTheme: () => {}, resolvedTheme: "light" }}>
         {children}
       </ThemeContext.Provider>
     )
