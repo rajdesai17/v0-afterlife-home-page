@@ -397,15 +397,14 @@ export default function Conversation({ name, years, url, agentId }: Conversation
                     )}
                   </div>
                   {isActive && step.sources.length > 0 && (
-                    <div className="ml-7 flex flex-wrap gap-1.5">
+                    <div className="ml-7 flex flex-col gap-1">
                       {step.sources.map((source, j) => {
-                        // Extract domain from URL for display
-                        let displayUrl = source.url
+                        let domain = source.url
                         try {
                           const urlObj = new URL(source.url)
-                          displayUrl = urlObj.hostname.replace("www.", "")
+                          domain = urlObj.hostname.replace("www.", "")
                         } catch {
-                          displayUrl = source.url
+                          domain = source.url
                         }
                         return (
                           <a
@@ -413,21 +412,33 @@ export default function Conversation({ name, years, url, agentId }: Conversation
                             href={source.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 font-mono text-[10px] transition-colors ${
-                              source.status === "found"
-                                ? "border-live/30 bg-live/5 text-live hover:bg-live/10"
-                                : source.status === "searching"
-                                ? "border-border bg-muted text-muted-foreground animate-pulse"
-                                : "border-border bg-muted/50 text-ghost line-through"
+                            className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-muted/50 ${
+                              source.status === "searching"
+                                ? "animate-pulse"
+                                : source.status === "not_found"
+                                ? "opacity-40"
+                                : ""
                             }`}
                           >
                             {source.status === "searching" && (
-                              <Loader2 className="size-2.5 animate-spin" />
+                              <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
                             )}
                             {source.status === "found" && (
-                              <Check className="size-2.5" strokeWidth={3} />
+                              <span className="flex size-3.5 shrink-0 items-center justify-center rounded-sm bg-live/20">
+                                <Check className="size-2.5 text-live" strokeWidth={3} />
+                              </span>
                             )}
-                            {displayUrl}
+                            {source.status === "not_found" && (
+                              <span className="size-3.5 shrink-0 rounded-sm bg-muted" />
+                            )}
+                            <span className={`min-w-0 flex-1 truncate ${
+                              source.status === "found" ? "text-foreground" : "text-muted-foreground"
+                            }`}>
+                              {source.title}
+                            </span>
+                            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                              {domain}
+                            </span>
                           </a>
                         )
                       })}
@@ -480,14 +491,14 @@ export default function Conversation({ name, years, url, agentId }: Conversation
                     )}
                   </div>
                   {foundSources.length > 0 && (
-                    <div className="ml-7 flex flex-wrap gap-1.5">
+                    <div className="ml-7 flex flex-col gap-1">
                       {foundSources.map((source, j) => {
-                        let displayUrl = source.url
+                        let domain = source.url
                         try {
                           const urlObj = new URL(source.url)
-                          displayUrl = urlObj.hostname.replace("www.", "")
+                          domain = urlObj.hostname.replace("www.", "")
                         } catch {
-                          displayUrl = source.url
+                          domain = source.url
                         }
                         return (
                           <a
@@ -495,10 +506,17 @@ export default function Conversation({ name, years, url, agentId }: Conversation
                             href={source.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded-full border border-live/30 bg-live/5 px-2.5 py-0.5 font-mono text-[10px] text-live transition-colors hover:bg-live/10"
+                            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-muted/50"
                           >
-                            <Check className="size-2.5" strokeWidth={3} />
-                            {displayUrl}
+                            <span className="flex size-3.5 shrink-0 items-center justify-center rounded-sm bg-live/20">
+                              <Check className="size-2.5 text-live" strokeWidth={3} />
+                            </span>
+                            <span className="min-w-0 flex-1 truncate text-foreground">
+                              {source.title}
+                            </span>
+                            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                              {domain}
+                            </span>
                           </a>
                         )
                       })}
