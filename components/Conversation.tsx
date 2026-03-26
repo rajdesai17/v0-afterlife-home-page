@@ -420,16 +420,14 @@ export default function Conversation({ name, years, url, agentId }: Conversation
                                 : ""
                             }`}
                           >
-                            {source.status === "searching" && (
-                              <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
-                            )}
-                            {source.status === "found" && (
-                              <span className="flex size-3.5 shrink-0 items-center justify-center rounded-sm bg-live/20">
-                                <Check className="size-2.5 text-live" strokeWidth={3} />
-                              </span>
-                            )}
-                            {source.status === "not_found" && (
-                              <span className="size-3.5 shrink-0 rounded-sm bg-muted" />
+                            {source.status === "searching" ? (
+                              <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
+                            ) : (
+                              <img
+                                src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                                alt=""
+                                className={`size-4 shrink-0 rounded-sm ${source.status === "not_found" ? "opacity-30 grayscale" : ""}`}
+                              />
                             )}
                             <span className={`min-w-0 flex-1 truncate ${
                               source.status === "found" ? "text-foreground" : "text-muted-foreground"
@@ -508,9 +506,11 @@ export default function Conversation({ name, years, url, agentId }: Conversation
                             rel="noopener noreferrer"
                             className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-muted/50"
                           >
-                            <span className="flex size-3.5 shrink-0 items-center justify-center rounded-sm bg-live/20">
-                              <Check className="size-2.5 text-live" strokeWidth={3} />
-                            </span>
+                            <img
+                              src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                              alt=""
+                              className="size-4 shrink-0 rounded-sm"
+                            />
                             <span className="min-w-0 flex-1 truncate text-foreground">
                               {source.title}
                             </span>
